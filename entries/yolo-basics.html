@@ -1,0 +1,134 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>YOLO 物件偵測原理｜YOLO 車牌辨識知識庫</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600;700&family=Noto+Sans+TC:wght@400;500;700;900&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="../assets/style.css">
+</head>
+<body data-slug="yolo-basics">
+  <header class="topbar">
+    <div class="wrap">
+      <a class="brand" href="../index.html"><span class="brand-mark"></span>Plate-YOLO Wiki</a>
+      <nav><a href="../index.html#entries">條目</a><a href="../index.html#chapters">論文章節</a></nav>
+    </div>
+  </header>
+
+  <main class="entry">
+    <header class="entry-head">
+      <p class="crumb"><a href="../index.html">知識庫</a> / <span data-fill="category"></span></p>
+      <h1><span class="badge" data-fill="no"></span><span data-fill="title"></span><small data-fill="en"></small></h1>
+      <dl class="spec" id="spec"></dl>
+    </header>
+
+    <section id="tldr">
+      <h2><span class="sec-no">01</span>一句話重點</h2>
+<p class="tldr">YOLO 把物件偵測當成「一次完成的迴歸問題」：影像切成 S×S 網格，每一格同時預測邊界框、信心分數與類別，只需一次前向傳播，所以速度快，適合即時的車牌偵測。</p>
+    </section>
+
+    <section id="concept">
+      <h2><span class="sec-no">02</span>核心概念</h2>
+<p><strong>為什麼需要它？</strong>早期的物件偵測多屬於「兩階段 (two-stage)」方法，例如 R-CNN 系列：先產生大量候選區域 (region proposals)，再逐一分類。準確但速度慢，難以處理路口攝影機每秒數十張的影像。</p>
+<p><strong>怎麼做？</strong>YOLO (You Only Look Once) 是「單階段 (one-stage)」偵測器。原始 YOLOv1 把輸入影像切成 S×S 個網格 (grid cell)；物件中心落在哪一格，就由那一格負責預測。每一格輸出 B 個邊界框 (x, y, w, h)、每個框的信心分數，以及 C 個類別的條件機率。</p>
+<p>網路輸出大量重疊的框之後，再用<strong>非極大值抑制 (Non-Maximum Suppression, NMS)</strong> 去掉重複的框，只保留分數最高的那一個。</p>
+<p>後續版本持續改良：YOLOv2 引入錨框 (anchor boxes)，YOLOv3 在三種尺度上做預測、對小物件更友善，近期的 YOLOv8 等版本則改為無錨框 (anchor-free) 的偵測頭。</p>
+    </section>
+
+    <section id="figure">
+      <h2><span class="sec-no">03</span>圖解</h2>
+<svg class="fig" viewBox="0 0 720 260" role="img" aria-label="YOLO 流程：影像切成網格，CNN 輸出張量，經過 NMS 得到車牌框">
+  <defs><marker id="arr" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z"/></marker></defs>
+  <rect class="node" x="20" y="30" width="210" height="190"/>
+  <line class="grid-l" x1="50.0" y1="30" x2="50.0" y2="220"/><line class="grid-l" x1="20" y1="57.1" x2="230" y2="57.1"/><line class="grid-l" x1="80.0" y1="30" x2="80.0" y2="220"/><line class="grid-l" x1="20" y1="84.3" x2="230" y2="84.3"/><line class="grid-l" x1="110.0" y1="30" x2="110.0" y2="220"/><line class="grid-l" x1="20" y1="111.4" x2="230" y2="111.4"/><line class="grid-l" x1="140.0" y1="30" x2="140.0" y2="220"/><line class="grid-l" x1="20" y1="138.6" x2="230" y2="138.6"/><line class="grid-l" x1="170.0" y1="30" x2="170.0" y2="220"/><line class="grid-l" x1="20" y1="165.7" x2="230" y2="165.7"/><line class="grid-l" x1="200.0" y1="30" x2="200.0" y2="220"/><line class="grid-l" x1="20" y1="192.9" x2="230" y2="192.9"/>
+  <rect class="car" x="50" y="100" width="150" height="80" rx="14"/>
+  <rect class="plate-r" x="102" y="150" width="46" height="18" rx="2"/>
+  <rect class="bbox" x="96" y="144" width="58" height="30"/>
+  <rect class="bbox" x="92" y="140" width="66" height="36" opacity=".45"/>
+  <text class="note-t" x="125" y="245">① 切成 S×S 網格</text>
+  <path class="flow" d="M235,125 H285" marker-end="url(#arr)"/>
+  <rect class="node hi" x="290" y="85" width="120" height="80" rx="6"/>
+  <text class="node-t" x="350" y="115">CNN</text>
+  <text class="note-t" x="350" y="142">一次前向傳播</text>
+  <path class="flow" d="M410,125 H450" marker-end="url(#arr)"/>
+  <rect class="node" x="455" y="85" width="120" height="80" rx="6"/>
+  <text class="node-t" x="515" y="115">S×S×(5B+C)</text>
+  <text class="note-t" x="515" y="142">輸出張量</text>
+  <path class="flow" d="M575,125 H605" marker-end="url(#arr)"/>
+  <rect class="node" x="610" y="85" width="95" height="80" rx="6"/>
+  <text class="node-t" x="657" y="115">NMS</text>
+  <text class="note-t" x="657" y="142">去除重複框</text>
+  <text class="note-t" x="515" y="245">② 每格預測框＋信心＋類別　③ 保留最佳框</text>
+</svg>
+<p class="caption">圖：同一個車牌會被預測出多個重疊的框（淡色），經 NMS 後只留下最可信的一個。</p>
+    </section>
+
+    <section id="keypoints">
+      <h2><span class="sec-no">04</span>重點整理</h2>
+<div class="eq">confidence = Pr(Object) × IoU<sup>truth</sup><sub>pred</sub></div>
+<p class="eq-note">信心分數同時反映「這格有沒有物件」與「框得準不準」。IoU 定義見 <a href="map-iou.html">005 IoU 與 mAP</a>。</p>
+<div class="eq">score<sub>i</sub> = Pr(Class<sub>i</sub> | Object) × Pr(Object) × IoU</div>
+<p class="eq-note">類別專屬分數：推論時用它排序並做 NMS。車牌偵測若只有一類 plate，C = 1。</p>
+<div class="eq">輸出張量大小 = S × S × (B·5 + C)</div>
+<p class="eq-note">YOLOv1 原論文使用 S = 7、B = 2、C = 20（PASCAL VOC），所以輸出為 7 × 7 × 30。</p>
+<div class="scroll-x"><table class="kv">
+  <tr><th>版本</th><th>年份</th><th>重點改變</th></tr>
+  <tr><td>YOLOv1</td><td>2016</td><td>單階段、網格預測</td></tr>
+  <tr><td>YOLOv2 (YOLO9000)</td><td>2017</td><td>錨框、Batch Normalization</td></tr>
+  <tr><td>YOLOv3</td><td>2018</td><td>三種尺度預測，小物件較佳</td></tr>
+  <tr><td>YOLOv4</td><td>2020</td><td>整合大量訓練技巧 (bag of freebies)</td></tr>
+  <tr><td>YOLOv5 / v8</td><td>2020 / 2023</td><td>Ultralytics 開源實作，易於訓練部署；無正式論文</td></tr>
+</table></div>
+    </section>
+
+    <section id="thesis">
+      <h2><span class="sec-no">05</span>與我的論文的關係</h2>
+<div class="thesis-box">
+  <h3>用在哪裡</h3>
+  <p>第二章 2.1 的理論基礎；第三章的車牌偵測模組就是一個單類別（或「車輛＋車牌」兩類）的 YOLO 偵測器。</p>
+  <h3>要注意什麼</h3>
+  <ul>
+    <li><strong>車牌是小物件</strong>：遠距離攝影時車牌可能只有十幾個像素寬，建議比較不同輸入解析度，或選用多尺度偵測頭的版本。</li>
+    <li><strong>台越車牌長寬比不同</strong>：台灣汽車車牌為細長單行；越南機車車牌為雙行、接近方形。可以把兩種車牌分成不同類別，或檢查錨框／資料分布是否涵蓋兩種比例。</li>
+    <li><strong>版本選擇</strong>：建議以一個主力版本（例如 YOLOv8）為主，再與另一版本做對照實驗，並在論文中說明選擇理由。</li>
+  </ul>
+</div>
+    </section>
+
+    <section id="pitfalls">
+      <h2><span class="sec-no">06</span>常見問題與注意事項</h2>
+<ul class="pitfalls">
+  <li><strong>輸入縮放讓車牌變更小：</strong>1920×1080 的影像縮到 640×640 後，車牌可能只剩幾個像素，偵測率會掉。</li>
+  <li><strong>NMS 門檻設定：</strong>門檻太低會刪掉相鄰車輛的車牌；太高會留下重複框。</li>
+  <li><strong>版本引用：</strong>YOLOv5／v8 沒有正式論文，引用時應寫 GitHub 儲存庫與版本號，不要誤植作者。</li>
+  <li><strong>信心分數不等於準確率：</strong>高信心的框仍可能是誤判（例如廣告招牌上的文字）。</li>
+</ul>
+    </section>
+
+    <section id="related">
+      <h2><span class="sec-no">07</span>相關條目</h2>
+<ul class="related">
+  <li><a href="two-stage-lpr.html">002 兩階段車牌辨識流程</a> <span>— YOLO 在整個辨識系統中負責第一階段</span></li>
+  <li><a href="map-iou.html">005 IoU 與 mAP 評估指標</a> <span>— 信心分數與 NMS 都用到 IoU</span></li>
+</ul>
+    </section>
+
+    <section id="references">
+      <h2><span class="sec-no">08</span>參考資料</h2>
+<ol class="refs">
+  <li>J. Redmon, S. Divvala, R. Girshick, A. Farhadi, "<em>You Only Look Once: Unified, Real-Time Object Detection</em>," CVPR, 2016.</li>
+  <li>J. Redmon, A. Farhadi, "<em>YOLO9000: Better, Faster, Stronger</em>," CVPR, 2017.</li>
+  <li>J. Redmon, A. Farhadi, "<em>YOLOv3: An Incremental Improvement</em>," arXiv:1804.02767, 2018.</li>
+  <li>A. Bochkovskiy, C.-Y. Wang, H.-Y. M. Liao, "<em>YOLOv4: Optimal Speed and Accuracy of Object Detection</em>," arXiv:2004.10934, 2020.</li>
+</ol>
+    </section>
+
+    <nav id="pager"></nav>
+  </main>
+
+  <script src="../assets/entries.js"></script>
+  <script src="../assets/app.js"></script>
+</body>
+</html>

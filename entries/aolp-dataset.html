@@ -1,0 +1,108 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>AOLP 台灣車牌資料集｜YOLO 車牌辨識知識庫</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600;700&family=Noto+Sans+TC:wght@400;500;700;900&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="../assets/style.css">
+</head>
+<body data-slug="aolp-dataset">
+  <header class="topbar">
+    <div class="wrap">
+      <a class="brand" href="../index.html"><span class="brand-mark"></span>Plate-YOLO Wiki</a>
+      <nav><a href="../index.html#entries">條目</a><a href="../index.html#chapters">論文章節</a></nav>
+    </div>
+  </header>
+
+  <main class="entry">
+    <header class="entry-head">
+      <p class="crumb"><a href="../index.html">知識庫</a> / <span data-fill="category"></span></p>
+      <h1><span class="badge" data-fill="no"></span><span data-fill="title"></span><small data-fill="en"></small></h1>
+      <dl class="spec" id="spec"></dl>
+    </header>
+
+    <section id="tldr">
+      <h2><span class="sec-no">01</span>一句話重點</h2>
+<p class="tldr">AOLP（Application-Oriented License Plate）是台灣的公開車牌資料集，共 2,049 張影像，依應用情境分成門禁 (AC)、執法 (LE)、巡邏 (RP) 三組，是研究台灣車牌辨識最常用的基準。</p>
+    </section>
+
+    <section id="concept">
+      <h2><span class="sec-no">02</span>核心概念</h2>
+<p><strong>為什麼需要它？</strong>車牌的字型、長寬比、顏色和字元規則因國家而異，用中國或歐美資料集訓練的模型，直接拿來辨識台灣車牌效果通常不好。AOLP 提供了台灣車牌的公開基準，方便和其他論文比較結果。</p>
+<p><strong>三種情境。</strong>作者依「攝影機怎麼架、車子離多遠」把影像分成三組：AC 情境的車輛靠近、角度較正；LE 情境來自路邊攝影機，車牌較小、角度變化較大；RP 情境則是從移動中的巡邏車拍攝，背景與角度最多變。</p>
+<p><strong>用法。</strong>常見的實驗設計是用其中兩組訓練、剩下一組測試，輪流進行，用來檢驗模型能不能推廣到沒看過的情境。</p>
+    </section>
+
+    <section id="figure">
+      <h2><span class="sec-no">03</span>圖解</h2>
+<svg class="fig" viewBox="0 0 720 240" role="img" aria-label="AOLP 三個子集的影像數量：AC 681 張、LE 757 張、RP 611 張">
+  <text class="node-t" x="40" y="60">AC</text><text class="note-t l" x="70" y="84">門禁 Access Control</text><rect class="node hi" x="230" y="40" width="360" height="40" rx="3"/><text class="node-t" x="630" y="60">681</text><text class="node-t" x="40" y="122">LE</text><text class="note-t l" x="70" y="146">執法 Law Enforcement</text><rect class="node hi" x="230" y="102" width="400" height="40" rx="3"/><text class="node-t" x="670" y="122">757</text><text class="node-t" x="40" y="184">RP</text><text class="note-t l" x="70" y="208">巡邏 Road Patrol</text><rect class="node hi" x="230" y="164" width="323" height="40" rx="3"/><text class="node-t" x="593" y="184">611</text>
+  <text class="note-t" x="430" y="230">合計 2,049 張影像</text>
+</svg>
+<p class="caption">圖：AOLP 三個子集的影像數量（依原論文）。</p>
+    </section>
+
+    <section id="keypoints">
+      <h2><span class="sec-no">04</span>重點整理</h2>
+<div class="scroll-x"><table class="kv">
+  <tr><th>資料集</th><th>地區</th><th>規模</th><th>特色</th></tr>
+  <tr><td>AOLP</td><td>台灣</td><td>2,049 張</td><td>三種應用情境，台灣車牌</td></tr>
+  <tr><td>CCPD</td><td>中國</td><td>超過 25 萬張</td><td>停車場影像，含 Weather、Challenge 等子集</td></tr>
+  <tr><td>UFPR-ALPR</td><td>巴西</td><td>4,500 張</td><td>行進中車輛，含汽車與機車</td></tr>
+  <tr><td>越南車牌</td><td>越南</td><td>（待查證）</td><td>公開資料集較少，可能需要自行收集與標註</td></tr>
+</table></div>
+<div class="eq">&lt;class&gt; &lt;x_center&gt; &lt;y_center&gt; &lt;width&gt; &lt;height&gt;</div>
+<p class="eq-note">YOLO 標註格式：每個框一行，座標都除以影像寬高、介於 0~1。使用 AOLP 前需把原始標註轉成這種格式。</p>
+    </section>
+
+    <section id="thesis">
+      <h2><span class="sec-no">05</span>與我的論文的關係</h2>
+<div class="thesis-box">
+  <h3>用在哪裡</h3>
+  <p>第二章 2.3 介紹台灣車牌資料集時的主要條目；第四章可以用 AOLP 當作「正常天候」的基準測試集，和惡劣天候的結果對照。</p>
+  <h3>要注意什麼</h3>
+  <ul>
+    <li><strong>惡劣天候樣本不足</strong>：AOLP 以一般天候為主，無法單獨支撐「惡劣環境」的研究重點，建議另外收集雨天／夜間影像，或以資料增強合成。</li>
+    <li><strong>車牌樣式年代</strong>：資料集發表於 2013 年，台灣 2012 年後的新式 7 碼車牌可能較少（待查證），需要確認是否與實際應用相符。</li>
+    <li><strong>越南部分</strong>：AOLP 只有台灣車牌，越南場景需另找資料來源，這也可以寫成論文的研究缺口。</li>
+  </ul>
+</div>
+    </section>
+
+    <section id="pitfalls">
+      <h2><span class="sec-no">06</span>常見問題與注意事項</h2>
+<ul class="pitfalls">
+  <li><strong>使用條款：</strong>下載前確認授權方式，論文中要正確引用原作者。</li>
+  <li><strong>資料洩漏：</strong>同一台車的多張影像不要同時出現在訓練集與測試集，否則準確率會被高估。</li>
+  <li><strong>標註格式不同：</strong>原始標註需轉成 YOLO 格式，轉換後要抽樣畫框檢查是否對齊。</li>
+  <li><strong>資料量小：</strong>只有約兩千張，訓練大型模型容易過擬合，建議使用預訓練權重做微調。</li>
+</ul>
+    </section>
+
+    <section id="related">
+      <h2><span class="sec-no">07</span>相關條目</h2>
+<ul class="related">
+  <li><a href="two-stage-lpr.html">002 兩階段車牌辨識流程</a> <span>— 用這份資料集訓練與測試的系統</span></li>
+  <li><a href="adverse-weather.html">004 惡劣天氣下的偵測挑戰</a> <span>— AOLP 缺少的部分</span></li>
+</ul>
+    </section>
+
+    <section id="references">
+      <h2><span class="sec-no">08</span>參考資料</h2>
+<ol class="refs">
+  <li>G.-S. Hsu, J.-C. Chen, Y.-Z. Chung, "<em>Application-Oriented License Plate Recognition</em>," IEEE Transactions on Vehicular Technology, vol. 62, no. 2, pp. 552–561, 2013.</li>
+  <li>Z. Xu, W. Yang, A. Meng, N. Lu, H. Huang, C. Ying, L. Huang, "<em>Towards End-to-End License Plate Detection and Recognition: A Large Dataset and Baseline</em>," ECCV, 2018.（CCPD）</li>
+  <li>R. Laroca et al., "<em>A Robust Real-Time Automatic License Plate Recognition Based on the YOLO Detector</em>," IJCNN, 2018.（UFPR-ALPR）</li>
+</ol>
+    </section>
+
+    <nav id="pager"></nav>
+  </main>
+
+  <script src="../assets/entries.js"></script>
+  <script src="../assets/app.js"></script>
+</body>
+</html>

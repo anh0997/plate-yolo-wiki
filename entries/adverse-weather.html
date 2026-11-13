@@ -1,0 +1,116 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>惡劣天氣下的偵測挑戰｜YOLO 車牌辨識知識庫</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600;700&family=Noto+Sans+TC:wght@400;500;700;900&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="../assets/style.css">
+</head>
+<body data-slug="adverse-weather">
+  <header class="topbar">
+    <div class="wrap">
+      <a class="brand" href="../index.html"><span class="brand-mark"></span>Plate-YOLO Wiki</a>
+      <nav><a href="../index.html#entries">條目</a><a href="../index.html#chapters">論文章節</a></nav>
+    </div>
+  </header>
+
+  <main class="entry">
+    <header class="entry-head">
+      <p class="crumb"><a href="../index.html">知識庫</a> / <span data-fill="category"></span></p>
+      <h1><span class="badge" data-fill="no"></span><span data-fill="title"></span><small data-fill="en"></small></h1>
+      <dl class="spec" id="spec"></dl>
+    </header>
+
+    <section id="tldr">
+      <h2><span class="sec-no">01</span>一句話重點</h2>
+<p class="tldr">雨、霧、夜間會降低影像的對比與清晰度，讓車牌偵測與字元辨識的表現明顯下降；常見對策有影像復原前處理、資料增強、更換感測器，以及收集惡劣天候的訓練資料。</p>
+    </section>
+
+    <section id="concept">
+      <h2><span class="sec-no">02</span>核心概念</h2>
+<p><strong>為什麼是問題？</strong>大多數公開資料集都在晴天、白天拍攝。模型在這些資料上表現很好，但遇到台灣梅雨季或越南雨季的大雨、清晨的霧、夜間車燈眩光時，偵測率可能大幅下降。</p>
+<p><strong>各種狀況的影響不同：</strong>雨會在影像上留下雨絲並讓鏡頭起水珠；霧因為大氣散射，讓遠處物體對比降低、整體偏白；夜間則有雜訊多、曝光不足，以及車燈與車牌反光造成的過曝；車速快時還會出現動態模糊。</p>
+<p><strong>四種對策方向：</strong>(1) <strong>前處理復原</strong>：去霧、去雨、低光增強後再送進 YOLO；(2) <strong>資料增強</strong>：在晴天影像上合成霧、雨、暗光，讓模型在訓練時就看過；(3) <strong>換感測器</strong>：例如熱成像攝影機在黑暗與霧中仍能看到車輛；(4) <strong>收集真實惡劣天候資料</strong>，並依天候分組評估。</p>
+    </section>
+
+    <section id="figure">
+      <h2><span class="sec-no">03</span>圖解</h2>
+<svg class="fig" viewBox="0 0 720 220" role="img" aria-label="同一台車在晴天、霧、雨、夜間四種情況下的示意圖">
+  <rect class="node" x="10" y="30" width="160" height="150" rx="4"/><rect class="car" x="30" y="80" width="120" height="70" rx="12"/><rect class="plate-r" x="62" y="122" width="56" height="20" rx="2"/><rect class="bbox" x="58" y="117" width="64" height="30"/><text class="node-t" x="90" y="205">晴天</text>
+  <rect class="node" x="185" y="30" width="160" height="150" rx="4"/><rect class="car" x="205" y="80" width="120" height="70" rx="12"/><rect class="plate-r" x="237" y="122" width="56" height="20" rx="2"/><rect class="haze" x="185" y="30" width="160" height="150" rx="4"/><rect class="bbox" x="233" y="117" width="64" height="30" opacity=".5"/><text class="node-t" x="265" y="205">霧</text>
+  <rect class="node" x="360" y="30" width="160" height="150" rx="4"/><rect class="car" x="380" y="80" width="120" height="70" rx="12"/><rect class="plate-r" x="412" y="122" width="56" height="20" rx="2"/><text class="node-t" x="440" y="205">雨</text>
+  <rect class="node" x="535" y="30" width="160" height="150" rx="4"/><rect class="car" x="555" y="80" width="120" height="70" rx="12"/><rect class="plate-r" x="587" y="122" width="56" height="20" rx="2"/><rect class="node" x="535" y="30" width="160" height="150" rx="4" opacity=".85"/><circle class="tag-r" cx="572" cy="140" r="9" opacity=".8"/><circle class="tag-r" cx="658" cy="140" r="9" opacity=".8"/><text class="node-t" x="615" y="205">夜間</text>
+  <line class="rain" x1="372" y1="40" x2="365" y2="64"/><line class="rain" x1="387" y1="54" x2="380" y2="78"/><line class="rain" x1="402" y1="68" x2="395" y2="92"/><line class="rain" x1="417" y1="40" x2="410" y2="64"/><line class="rain" x1="432" y1="54" x2="425" y2="78"/><line class="rain" x1="447" y1="68" x2="440" y2="92"/><line class="rain" x1="462" y1="40" x2="455" y2="64"/><line class="rain" x1="477" y1="54" x2="470" y2="78"/><line class="rain" x1="492" y1="68" x2="485" y2="92"/><line class="rain" x1="507" y1="40" x2="500" y2="64"/>
+  <line class="rain" x1="376" y1="100" x2="369" y2="124"/><line class="rain" x1="391" y1="130" x2="384" y2="154"/><line class="rain" x1="406" y1="100" x2="399" y2="124"/><line class="rain" x1="421" y1="130" x2="414" y2="154"/><line class="rain" x1="436" y1="100" x2="429" y2="124"/><line class="rain" x1="451" y1="130" x2="444" y2="154"/><line class="rain" x1="466" y1="100" x2="459" y2="124"/><line class="rain" x1="481" y1="130" x2="474" y2="154"/><line class="rain" x1="496" y1="100" x2="489" y2="124"/><line class="rain" x1="511" y1="130" x2="504" y2="154"/>
+</svg>
+<p class="caption">圖：示意同一台車在四種情況下的樣子。晴天容易框出車牌；霧降低對比，框的信心下降；雨絲遮擋；夜間車燈眩光蓋過車牌。</p>
+    </section>
+
+    <section id="keypoints">
+      <h2><span class="sec-no">04</span>重點整理</h2>
+<div class="eq">I(x) = J(x)·t(x) + A·(1 − t(x))，　t(x) = e<sup>−β·d(x)</sup></div>
+<p class="eq-note">大氣散射模型：I 為拍到的有霧影像、J 為清晰影像、A 為大氣光、t 為透射率、β 為散射係數、d 為距離。距離越遠 t 越小，影像越接近一片灰白。也可以反過來用這條公式在晴天影像上「合成霧」做資料增強。</p>
+<div class="eq">J<sup>dark</sup>(x) = min<sub>c∈{r,g,b}</sub> ( min<sub>y∈Ω(x)</sub> J<sup>c</sup>(y) ) ≈ 0</div>
+<p class="eq-note">暗通道先驗 (Dark Channel Prior)：清晰的戶外影像中，大多數區域至少有一個色彩通道很暗，據此可以估計透射率並去霧。</p>
+<div class="scroll-x"><table class="kv">
+  <tr><th>對策</th><th>優點</th><th>缺點</th></tr>
+  <tr><td>前處理復原</td><td>不用改 YOLO 本身</td><td>增加運算時間；復原結果可能產生假紋理</td></tr>
+  <tr><td>資料增強</td><td>成本低，容易實作</td><td>合成效果和真實天候有落差</td></tr>
+  <tr><td>熱成像</td><td>黑暗與霧中仍看得到車輛</td><td>車牌字元在熱影像中通常難以辨識（待查證）、設備昂貴</td></tr>
+  <tr><td>真實資料</td><td>最貼近實際應用</td><td>收集與標註成本高</td></tr>
+</table></div>
+    </section>
+
+    <section id="thesis">
+      <h2><span class="sec-no">05</span>與我的論文的關係</h2>
+<div class="thesis-box">
+  <h3>用在哪裡</h3>
+  <p>這是論文的<strong>研究重點與動機</strong>：第一章說明為什麼要研究惡劣環境，第二章 2.4 整理現有對策，第三章選定方法，第四章依天候分組報告結果。</p>
+  <h3>要注意什麼</h3>
+  <ul>
+    <li><strong>建立分組測試集</strong>：建議把測試資料依「晴天／雨天／霧／夜間」分組，各自報告 mAP，才能看出方法在哪種天候有改善。</li>
+    <li><strong>台越氣候特色</strong>：台灣梅雨與颱風季、越南雨季的大雨都很常見，可以寫進研究動機。</li>
+    <li><strong>熱成像的角色</strong>：課堂報告過的 Kristo 等人 (2020) 用熱成像加 YOLO 偵測人與車輛；但車牌辨識需要讀字元，熱成像可能較適合當作車輛定位的輔助，這一點可以在論文中討論。</li>
+  </ul>
+</div>
+    </section>
+
+    <section id="pitfalls">
+      <h2><span class="sec-no">06</span>常見問題與注意事項</h2>
+<ul class="pitfalls">
+  <li><strong>只測合成資料：</strong>只在人工加霧的影像上測試，結果可能過於樂觀，最好至少有一部分真實惡劣天候影像。</li>
+  <li><strong>前處理拖慢速度：</strong>去霧、去雨演算法可能比 YOLO 本身還慢，要一起報告 FPS。</li>
+  <li><strong>夜間反光：</strong>車牌本身會反光，強光下可能整塊過曝，問題不只是「太暗」。</li>
+  <li><strong>天候標籤不一致：</strong>「小雨」「大雨」的界線要先定義清楚，標註時才不會混亂。</li>
+</ul>
+    </section>
+
+    <section id="related">
+      <h2><span class="sec-no">07</span>相關條目</h2>
+<ul class="related">
+  <li><a href="aolp-dataset.html">003 AOLP 台灣車牌資料集</a> <span>— 以晴天為主，需要補充惡劣天候資料</span></li>
+  <li><a href="map-iou.html">005 IoU 與 mAP 評估指標</a> <span>— 依天候分組評估時使用</span></li>
+  <li><a href="yolo-basics.html">001 YOLO 物件偵測原理</a> <span>— 被強化的偵測器本體</span></li>
+</ul>
+    </section>
+
+    <section id="references">
+      <h2><span class="sec-no">08</span>參考資料</h2>
+<ol class="refs">
+  <li>M. Kristo, M. Ivasic-Kos, M. Pobar, "<em>Thermal Object Detection in Difficult Weather Conditions Using YOLO</em>," IEEE Access, vol. 8, 2020.</li>
+  <li>K. He, J. Sun, X. Tang, "<em>Single Image Haze Removal Using Dark Channel Prior</em>," CVPR, 2009.</li>
+  <li>C. Sakaridis, D. Dai, L. Van Gool, "<em>Semantic Foggy Scene Understanding with Synthetic Data</em>," International Journal of Computer Vision, 2018.</li>
+  <li>Z. Xu et al., "<em>Towards End-to-End License Plate Detection and Recognition: A Large Dataset and Baseline</em>," ECCV, 2018.（CCPD-Weather 子集）</li>
+</ol>
+    </section>
+
+    <nav id="pager"></nav>
+  </main>
+
+  <script src="../assets/entries.js"></script>
+  <script src="../assets/app.js"></script>
+</body>
+</html>

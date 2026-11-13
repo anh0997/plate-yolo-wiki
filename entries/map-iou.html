@@ -1,0 +1,121 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>IoU 與 mAP 評估指標｜YOLO 車牌辨識知識庫</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600;700&family=Noto+Sans+TC:wght@400;500;700;900&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="../assets/style.css">
+</head>
+<body data-slug="map-iou">
+  <header class="topbar">
+    <div class="wrap">
+      <a class="brand" href="../index.html"><span class="brand-mark"></span>Plate-YOLO Wiki</a>
+      <nav><a href="../index.html#entries">條目</a><a href="../index.html#chapters">論文章節</a></nav>
+    </div>
+  </header>
+
+  <main class="entry">
+    <header class="entry-head">
+      <p class="crumb"><a href="../index.html">知識庫</a> / <span data-fill="category"></span></p>
+      <h1><span class="badge" data-fill="no"></span><span data-fill="title"></span><small data-fill="en"></small></h1>
+      <dl class="spec" id="spec"></dl>
+    </header>
+
+    <section id="tldr">
+      <h2><span class="sec-no">01</span>一句話重點</h2>
+<p class="tldr">IoU 用「兩個框重疊的比例」判斷一次偵測算不算對；再依信心分數排序畫出 Precision–Recall 曲線，曲線下面積就是 AP，所有類別 AP 的平均就是 mAP。</p>
+    </section>
+
+    <section id="concept">
+      <h2><span class="sec-no">02</span>核心概念</h2>
+<p><strong>為什麼需要它？</strong>偵測模型輸出的是框，不是單純的對或錯。我們需要一個規則判斷「這個預測框算不算找到車牌」，也需要一個數字總結模型在各種信心門檻下的整體表現，才能公平比較不同模型與不同天候。</p>
+<p><strong>IoU (Intersection over Union)</strong>：預測框與真實框 (ground truth) 的交集面積除以聯集面積，介於 0~1。IoU 大於門檻（常用 0.5）就算真陽性 (TP)，否則是假陽性 (FP)；沒被找到的真實框則是假陰性 (FN)。</p>
+<p><strong>AP 與 mAP</strong>：把所有預測框依信心分數由高到低排序，逐一計算 Precision 與 Recall，畫出 PR 曲線，曲線下面積為該類別的平均精確度 (Average Precision, AP)。多個類別的 AP 取平均就是 mAP。</p>
+<p><strong>兩種常見寫法</strong>：mAP@0.5 表示 IoU 門檻固定 0.5（PASCAL VOC 習慣）；mAP@0.5:0.95 則在 0.5 到 0.95、每 0.05 一個門檻，共 10 個門檻上取平均（COCO 習慣），對框的精準度要求更嚴格。</p>
+    </section>
+
+    <section id="figure">
+      <h2><span class="sec-no">03</span>圖解</h2>
+<svg class="fig" viewBox="0 0 720 240" role="img" aria-label="左圖：預測框與真實框的交集與聯集；右圖：Precision-Recall 曲線及其下方面積">
+  <defs><marker id="arr" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z"/></marker></defs>
+  <rect class="bbox gt" x="60" y="60" width="160" height="90"/>
+  <rect class="bbox" x="110" y="90" width="160" height="90"/>
+  <rect class="ovl" x="110" y="90" width="110" height="60"/>
+  <text class="note-t l" x="60" y="48">真實框 (GT)</text>
+  <text class="note-t l" x="200" y="200">預測框</text>
+  <text class="node-t" x="165" y="122">∩</text>
+  <text class="note-t" x="165" y="225">IoU = 交集 ÷ 聯集</text>
+  <path class="flow" d="M400,200 H650" marker-end="url(#arr)"/>
+  <path class="flow" d="M400,200 V40" marker-end="url(#arr)"/>
+  <path class="ovl" d="M420,60 L470,62 L510,70 L540,85 L570,110 L600,150 L620,190 L620,200 L400,200 L400,60 Z"/>
+  <path class="flow" d="M400,60 L420,60 L470,62 L510,70 L540,85 L570,110 L600,150 L620,190"/>
+  <text class="note-t" x="655" y="218">Recall</text>
+  <text class="note-t l" x="406" y="34">Precision</text>
+  <text class="node-t" x="490" y="150">AP</text>
+</svg>
+<p class="caption">圖：左為 IoU 的計算方式；右為 PR 曲線，綠色面積即為 AP。</p>
+    </section>
+
+    <section id="keypoints">
+      <h2><span class="sec-no">04</span>重點整理</h2>
+<div class="eq">IoU = |A ∩ B| / |A ∪ B|</div>
+<p class="eq-note">A：預測框；B：真實框。完全重合為 1，完全不重疊為 0。</p>
+<div class="eq">Precision = TP / (TP + FP)，　Recall = TP / (TP + FN)</div>
+<p class="eq-note">Precision：框出來的有多少是對的；Recall：該找到的車牌找到了多少。</p>
+<div class="eq">AP = ∫<sub>0</sub><sup>1</sup> p(r) dr，　mAP = (1/N) Σ<sub>i=1</sub><sup>N</sup> AP<sub>i</sub></div>
+<p class="eq-note">p(r)：Recall 為 r 時的 Precision；N：類別數。若只有 plate 一類，mAP 就等於 AP。</p>
+<div class="eq">車牌辨識正確率 = 整串號碼完全正確的車牌數 / 車牌總數</div>
+<p class="eq-note">第二階段字元辨識常用的指標：只要錯一個字元就算整張錯。</p>
+    </section>
+
+    <section id="thesis">
+      <h2><span class="sec-no">05</span>與我的論文的關係</h2>
+<div class="thesis-box">
+  <h3>用在哪裡</h3>
+  <p>第四章實驗結果的主要指標。建議論文同時報告：偵測的 mAP@0.5 與 mAP@0.5:0.95、整串車牌辨識正確率，以及推論速度 FPS（附上硬體規格）。</p>
+  <h3>要注意什麼</h3>
+  <ul>
+    <li><strong>依天候分組報告</strong>：把晴天、雨天、霧、夜間各自的 mAP 做成表格，才能凸顯惡劣環境的研究重點。</li>
+    <li><strong>和其他論文比較</strong>：先確認對方用的是哪一種 mAP、哪個資料集、哪種切分方式，條件不同的數字不能直接比較。</li>
+  </ul>
+</div>
+    </section>
+
+    <section id="pitfalls">
+      <h2><span class="sec-no">06</span>常見問題與注意事項</h2>
+<ul class="pitfalls">
+  <li><strong>混用 mAP 定義：</strong>mAP@0.5 通常遠高於 mAP@0.5:0.95，表格中務必標明。</li>
+  <li><strong>小物件對 IoU 很敏感：</strong>車牌只有幾十個像素時，框偏移幾個像素 IoU 就會大幅下降。</li>
+  <li><strong>字元正確率 ≠ 車牌正確率：</strong>字元層級 95% 正確，整串車牌正確率可能低很多。</li>
+  <li><strong>FPS 沒寫硬體：</strong>同一模型在不同 GPU 上的速度差很多，沒有硬體規格的 FPS 沒有參考價值。</li>
+</ul>
+    </section>
+
+    <section id="related">
+      <h2><span class="sec-no">07</span>相關條目</h2>
+<ul class="related">
+  <li><a href="yolo-basics.html">001 YOLO 物件偵測原理</a> <span>— 信心分數與 NMS 也用到 IoU</span></li>
+  <li><a href="two-stage-lpr.html">002 兩階段車牌辨識流程</a> <span>— 兩個階段需要不同的指標</span></li>
+  <li><a href="adverse-weather.html">004 惡劣天氣下的偵測挑戰</a> <span>— 依天候分組評估</span></li>
+</ul>
+    </section>
+
+    <section id="references">
+      <h2><span class="sec-no">08</span>參考資料</h2>
+<ol class="refs">
+  <li>M. Everingham, L. Van Gool, C. K. I. Williams, J. Winn, A. Zisserman, "<em>The PASCAL Visual Object Classes (VOC) Challenge</em>," International Journal of Computer Vision, vol. 88, no. 2, pp. 303–338, 2010.</li>
+  <li>T.-Y. Lin et al., "<em>Microsoft COCO: Common Objects in Context</em>," ECCV, 2014.</li>
+  <li>R. Padilla, S. L. Netto, E. A. B. da Silva, "<em>A Survey on Performance Metrics for Object-Detection Algorithms</em>," IWSSIP, 2020.</li>
+</ol>
+    </section>
+
+    <nav id="pager"></nav>
+  </main>
+
+  <script src="../assets/entries.js"></script>
+  <script src="../assets/app.js"></script>
+</body>
+</html>

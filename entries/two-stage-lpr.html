@@ -1,0 +1,124 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>兩階段車牌辨識流程｜YOLO 車牌辨識知識庫</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600;700&family=Noto+Sans+TC:wght@400;500;700;900&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="../assets/style.css">
+</head>
+<body data-slug="two-stage-lpr">
+  <header class="topbar">
+    <div class="wrap">
+      <a class="brand" href="../index.html"><span class="brand-mark"></span>Plate-YOLO Wiki</a>
+      <nav><a href="../index.html#entries">條目</a><a href="../index.html#chapters">論文章節</a></nav>
+    </div>
+  </header>
+
+  <main class="entry">
+    <header class="entry-head">
+      <p class="crumb"><a href="../index.html">知識庫</a> / <span data-fill="category"></span></p>
+      <h1><span class="badge" data-fill="no"></span><span data-fill="title"></span><small data-fill="en"></small></h1>
+      <dl class="spec" id="spec"></dl>
+    </header>
+
+    <section id="tldr">
+      <h2><span class="sec-no">01</span>一句話重點</h2>
+<p class="tldr">車牌辨識 (License Plate Recognition, LPR) 通常分兩階段：先用偵測器找出車牌位置，再對裁切出的車牌做字元辨識，最後用格式規則檢查並比對名單。</p>
+    </section>
+
+    <section id="concept">
+      <h2><span class="sec-no">02</span>核心概念</h2>
+<p><strong>為什麼要分階段？</strong>一張路口影像裡車牌只佔很小的面積，直接對整張圖做文字辨識既慢又容易被招牌、路標干擾。先把車牌「找出來、切出來」，第二階段只需要處理一小塊乾淨的影像。</p>
+<p><strong>第一階段：偵測。</strong>用 YOLO 偵測車牌（有些系統會先偵測車輛，再在車輛範圍內找車牌，可以減少誤判）。輸出是車牌的邊界框。</p>
+<p><strong>第二階段：辨識。</strong>把車牌裁切出來、必要時做傾斜校正，再辨識字元。常見做法有兩種：(1) 字元分割後逐字分類（也可以再用一個 YOLO 偵測每個字元），(2) 不分割，直接用序列模型（如 CRNN + CTC）輸出整串文字。</p>
+<p><strong>後處理。</strong>用車牌格式規則修正明顯錯誤（例如某個位置只可能是英文字母），最後把車牌號碼與報廢／違規車輛名單比對。</p>
+    </section>
+
+    <section id="figure">
+      <h2><span class="sec-no">03</span>圖解</h2>
+<svg class="fig" viewBox="0 0 720 230" role="img" aria-label="兩階段車牌辨識流程：影像、車牌偵測、裁切校正、字元辨識、格式檢查、名單比對">
+  <defs><marker id="arr" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z"/></marker></defs>
+  <rect class="node" x="10" y="40" width="100" height="56" rx="6"/><text class="node-t" x="60" y="68">輸入影像</text>
+  <path class="flow" d="M110,68 H135" marker-end="url(#arr)"/>
+  <rect class="node hi" x="137" y="40" width="120" height="56" rx="6"/><text class="node-t" x="197" y="61">① 車牌偵測</text><text class="note-t" x="197" y="83">YOLO</text>
+  <path class="flow" d="M257,68 H282" marker-end="url(#arr)"/>
+  <rect class="node" x="284" y="40" width="120" height="56" rx="6"/><text class="node-t" x="344" y="61">裁切＋校正</text><text class="note-t" x="344" y="83">透視轉換</text>
+  <path class="flow" d="M404,68 H429" marker-end="url(#arr)"/>
+  <rect class="node hi" x="431" y="40" width="130" height="56" rx="6"/><text class="node-t" x="496" y="61">② 字元辨識</text><text class="note-t" x="496" y="83">分割分類 / CRNN</text>
+  <path class="flow" d="M561,68 H586" marker-end="url(#arr)"/>
+  <rect class="node" x="588" y="40" width="120" height="56" rx="6"/><text class="node-t" x="648" y="61">格式檢查</text><text class="note-t" x="648" y="83">規則修正</text>
+  <path class="flow" d="M648,96 V140" marker-end="url(#arr)"/>
+  <rect class="node" x="560" y="142" width="148" height="56" rx="6"/><text class="node-t" x="634" y="164">名單比對</text><text class="note-t" x="634" y="186">報廢 / 違規車輛</text>
+  <rect class="plate-r" x="180" y="150" width="130" height="36" rx="3"/><text class="plate-t" x="245" y="169">ABC-1234</text>
+  <rect class="plate-r" x="350" y="140" width="90" height="56" rx="3"/><text class="plate-t" x="395" y="159">51A</text><text class="plate-t" x="395" y="182">123.45</text>
+  <text class="note-t" x="245" y="212">台灣汽車：單行（示意）</text>
+  <text class="note-t" x="395" y="214">越南機車：雙行（示意）</text>
+</svg>
+<p class="caption">圖：兩個綠框為需要訓練的模型；下方為虛構的示意車牌號碼。</p>
+    </section>
+
+    <section id="keypoints">
+      <h2><span class="sec-no">04</span>重點整理</h2>
+<div class="scroll-x"><table class="kv">
+  <tr><th>階段</th><th>輸入</th><th>輸出</th><th>常見方法</th></tr>
+  <tr><td>① 車牌偵測</td><td>整張影像</td><td>車牌框 + 信心分數</td><td>YOLO 系列</td></tr>
+  <tr><td>裁切校正</td><td>車牌框</td><td>正面化的車牌影像</td><td>透視轉換、角點偵測</td></tr>
+  <tr><td>② 字元辨識</td><td>車牌影像</td><td>字串</td><td>字元 YOLO、CRNN + CTC</td></tr>
+  <tr><td>後處理</td><td>字串</td><td>修正後的號碼</td><td>正規表示式、易混字表</td></tr>
+</table></div>
+<div class="eq">P<sub>系統</sub> ≈ P<sub>偵測</sub> × P<sub>辨識</sub></div>
+<p class="eq-note">誤差會串接：偵測漏掉的車牌，第二階段再好也救不回來。這是近似觀念，實際數字需以端對端實驗量測。</p>
+    </section>
+
+    <section id="thesis">
+      <h2><span class="sec-no">05</span>與我的論文的關係</h2>
+<div class="thesis-box">
+  <h3>用在哪裡</h3>
+  <p>這是第三章研究方法的系統架構圖。論文的流程圖可以直接以本頁的圖為基礎，再標註每個模組使用的模型與參數。</p>
+  <h3>要注意什麼</h3>
+  <ul>
+    <li><strong>台越格式不同</strong>：後處理需要兩套規則。台灣新式汽車車牌如 <code>ABC-1234</code>；越南車牌如 <code>51A-123.45</code>（省市代碼＋系列＋號碼）。完整的格式種類（舊式車牌、機車、營業車等）需再查證法規。</li>
+    <li><strong>雙行車牌</strong>：越南機車車牌是上下兩行，序列模型需要先拆成兩行，或改用字元偵測再依位置排序。</li>
+    <li><strong>惡劣環境影響的是哪一階段？</strong>建議實驗分開量測兩階段的表現，才能說明雨霧到底是讓偵測失敗，還是讓字元辨識失敗。</li>
+  </ul>
+</div>
+    </section>
+
+    <section id="pitfalls">
+      <h2><span class="sec-no">06</span>常見問題與注意事項</h2>
+<ul class="pitfalls">
+  <li><strong>誤差串接：</strong>只報告偵測 mAP 不夠，論文也要報告整串號碼完全正確的比例。</li>
+  <li><strong>易混字元：</strong>0/O、1/I、8/B、5/S 在模糊時很難分辨，可用「該位置只能是數字或字母」的規則修正。</li>
+  <li><strong>傾斜與透視：</strong>路邊攝影機角度大時，不校正會讓辨識率明顯下降。</li>
+  <li><strong>一張圖多台車：</strong>要確保每個辨識結果對應到正確的車輛，避免張冠李戴。</li>
+</ul>
+    </section>
+
+    <section id="related">
+      <h2><span class="sec-no">07</span>相關條目</h2>
+<ul class="related">
+  <li><a href="yolo-basics.html">001 YOLO 物件偵測原理</a> <span>— 第一階段使用的偵測器</span></li>
+  <li><a href="aolp-dataset.html">003 AOLP 台灣車牌資料集</a> <span>— 可用來訓練與測試這套流程</span></li>
+  <li><a href="map-iou.html">005 IoU 與 mAP 評估指標</a> <span>— 如何分別評估兩個階段</span></li>
+</ul>
+    </section>
+
+    <section id="references">
+      <h2><span class="sec-no">08</span>參考資料</h2>
+<ol class="refs">
+  <li>R. Laroca, E. Severo, L. A. Zanlorensi, L. S. Oliveira, G. R. Gonçalves, W. R. Schwartz, D. Menotti, "<em>A Robust Real-Time Automatic License Plate Recognition Based on the YOLO Detector</em>," IJCNN, 2018.</li>
+  <li>R. Laroca, L. A. Zanlorensi, G. R. Gonçalves, E. Todt, W. R. Schwartz, D. Menotti, "<em>An Efficient and Layout-Independent Automatic License Plate Recognition System Based on the YOLO Detector</em>," IET Intelligent Transport Systems, 2021.</li>
+  <li>B. Shi, X. Bai, C. Yao, "<em>An End-to-End Trainable Neural Network for Image-Based Sequence Recognition and Its Application to Scene Text Recognition</em>," IEEE TPAMI, 2017.（CRNN）</li>
+</ol>
+    </section>
+
+    <nav id="pager"></nav>
+  </main>
+
+  <script src="../assets/entries.js"></script>
+  <script src="../assets/app.js"></script>
+</body>
+</html>
