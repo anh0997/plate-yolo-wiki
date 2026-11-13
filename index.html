@@ -1,0 +1,79 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>YOLO 車牌辨識知識庫｜Plate-YOLO Wiki</title>
+  <meta name="description" content="碩士論文研究知識庫：以 YOLO 進行惡劣環境下之車牌辨識（台灣／越南交通）。">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600;700&family=Noto+Sans+TC:wght@400;500;700;900&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="assets/style.css">
+</head>
+<body>
+  <header class="topbar">
+    <div class="wrap">
+      <a class="brand" href="index.html"><span class="brand-mark"></span>Plate-YOLO Wiki</a>
+      <nav>
+        <a href="#entries">條目</a>
+        <a href="#chapters">論文章節</a>
+        <a class="hide-sm" href="#howto">如何擴充</a>
+      </nav>
+    </div>
+  </header>
+
+  <main class="wrap">
+    <section class="hero">
+      <p class="kicker">// 碩士論文研究知識庫 · 勤益科大 電機所</p>
+      <h1>用 YOLO 找出<br>惡劣環境下的<span class="boxed">車牌</span></h1>
+      <p class="lead">
+        我的碩士論文研究以 YOLO 偵測與辨識車牌，用來找出報廢或違規車輛，並著重在雨、霧、夜間等惡劣環境，
+        場景涵蓋台灣與越南的交通。這裡把讀過的論文、資料集、概念與評估方法整理成格式一致的知識條目，
+        每個條目都標註它在論文中對應的章節。
+      </p>
+      <ul class="stats">
+        <li><b id="stat-entries">0</b><span>知識條目</span></li>
+        <li><b id="stat-cats">0</b><span>涵蓋分類</span></li>
+        <li><b id="stat-chapters">0</b><span>對應論文章節</span></li>
+      </ul>
+    </section>
+
+    <section id="entries" aria-label="知識條目">
+      <div class="toolbar">
+        <div class="chips" id="chips" role="group" aria-label="分類篩選"></div>
+        <input class="search" id="search" type="search" placeholder="搜尋：mAP、霧、台灣…" aria-label="搜尋條目">
+      </div>
+      <p class="count" id="count"></p>
+      <div class="grid" id="grid"></div>
+      <p class="empty" id="empty" hidden>找不到符合的條目，換個關鍵字試試。</p>
+    </section>
+
+    <section id="chapters">
+      <h2 class="section-title">論文章節地圖</h2>
+      <p class="section-sub">每個條目都屬於論文的某一節。灰色代表還沒有條目，是下一步要補的地方。</p>
+      <ul class="chapter-map" id="chapter-map"></ul>
+    </section>
+
+    <section id="howto">
+      <h2 class="section-title">如何擴充這個知識庫</h2>
+      <p class="section-sub">規則都寫在 <a href="https://github.com/anh0997/plate-yolo-wiki/blob/main/AGENTS.md">AGENTS.md</a>，AI 讀完就能用同一套格式新增條目。</p>
+      <ol class="howto">
+        <li>對 AI 說：「依照 AGENTS.md 新增一個條目：CCPD 資料集」。</li>
+        <li>AI 在 <code>assets/entries.js</code> 末端加一筆資料，編號自動接續。</li>
+        <li>複製 <code>entries/_template.html</code>，填好固定的 8 個區塊。</li>
+        <li>不用改首頁，卡片、篩選、搜尋、章節地圖會自動更新。</li>
+      </ol>
+    </section>
+  </main>
+
+  <footer class="site">
+    <div class="wrap">
+      <span>丁國英｜勤益科大 電機碩一乙</span>
+      <span><a href="https://github.com/anh0997/plate-yolo-wiki">GitHub 原始碼</a></span>
+    </div>
+  </footer>
+
+  <script src="assets/entries.js"></script>
+  <script src="assets/app.js"></script>
+</body>
+</html>
