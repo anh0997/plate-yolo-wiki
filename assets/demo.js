@@ -19,8 +19,8 @@
    * L = 英文字母、D = 數字；fmt 決定顯示格式
    */
   var FORMATS = [
-    { region: "台灣", name: "新式汽車", tpl: "LLLDDDD", fmt: [3, "-"] },
-    { region: "台灣", name: "機車", tpl: "LLLDDD", fmt: [3, "-"] },
+    { region: "台灣", name: "新式（汽車／機車）", tpl: "LLLDDDD", fmt: [3, "-"] },
+    { region: "台灣", name: "舊式機車", tpl: "LLLDDD", fmt: [3, "-"] },
     { region: "台灣", name: "舊式機車", tpl: "DDDLLL", fmt: [3, "-"] },
     { region: "台灣", name: "舊式汽車", tpl: "LLDDDD", fmt: [2, "-"] },
     { region: "台灣", name: "舊式汽車", tpl: "DDDDLL", fmt: [4, "-"] },
@@ -261,28 +261,158 @@
     return inter / (a.w * a.h + b.w * b.h - inter);
   }
 
-  /* ---------- 前處理：裁切、放大、灰階、Otsu 二值化 ---------- */
+  /* ---------- 前處理：裁切 → 放大 → 傾斜校正 → 灰階 → Otsu → 清除邊框雜訊 → 補白邊 ----------
+   * OCR 會跑三種版本（variants），再挑最可信的結果：
+   *   A = 二值化 + 清除雜訊（預設預覽）  B = 只轉灰階  C = 二值化但不清除
+   */
   var crop = $("crop");
+  var angleDeg = 0;
+
+  function layoutRows() { return document.querySelector('input[name="layout"]:checked').value === "6" ? 2 : 1; }
+
+  // 把框選範圍畫到新畫布：放大到字高適中，並依角度旋轉（空白處補白）
+  function baseCanvas(angle) {
+    var rows = layoutRows();
+    var targetH = rows === 2 ? 220 : 130;
+    var k = Math.min(4, targetH / box.h);
+    var w = Math.max(1, Math.round(box.w * k)), h = Math.max(1, Math.round(box.h * k));
+    var c = document.createElement("canvas");
+    c.width = w; c.height = h;
+    var ctx = c.getContext("2d");
+    ctx.imageSmoothingQuality = "high";
+    ctx.translate(w / 2, h / 2);
+    ctx.rotate(angle * Math.PI / 180);
+    ctx.drawImage(img, box.x, box.y, box.w, box.h, -w / 2, -h / 2, w, h);
+    return c;
+  }
+  // 回傳灰階陣列；旋轉後空出的透明區域記為 mask=0，不參與門檻計算
+  function toGray(c) {
+    var d = c.getContext("2d").getImageData(0, 0, c.width, c.height).data;
+    var n = c.width * c.height, g = new Uint8ClampedArray(n), m = new Uint8Array(n), inv = $("opt-inv").checked;
+    for (var i = 0; i < n; i++) {
+      m[i] = d[i * 4 + 3] > 200 ? 1 : 0;
+      var v = 0.299 * d[i * 4] + 0.587 * d[i * 4 + 1] + 0.114 * d[i * 4 + 2];
+      g[i] = m[i] ? (inv ? 255 - v : v) : 255;
+    }
+    g.mask = m;
+    return g;
+  }
+  function binarize(g) {
+    var vals = [];
+    for (var i = 0; i < g.length; i++) if (g.mask[i]) vals.push(g[i]);
+    var th = otsu(vals), b = new Uint8Array(g.length);   // 1 = 黑（字）
+    for (var j = 0; j < g.length; j++) b[j] = g.mask[j] && g[j] <= th ? 1 : 0;
+    return b;
+  }
+  // 連通元件分析：保留「像字元」的黑色區塊，刪掉碰到邊框的大塊、太扁或太小的雜訊
+  function cleanBinary(b, W, H, rows) {
+    var label = new Int32Array(W * H), stack = [], comps = [];
+    var lineH = H / rows;
+    for (var p0 = 0; p0 < W * H; p0++) {
+      if (!b[p0] || label[p0]) continue;
+      var id = comps.length + 1;
+      var px = [], minX = W, maxX = 0, minY = H, maxY = 0, edge = false;
+      stack.push(p0); label[p0] = id;
+      while (stack.length) {
+        var p = stack.pop(), x = p % W, y = (p - x) / W;
+        px.push(p);
+        if (x < minX) minX = x; if (x > maxX) maxX = x;
+        if (y < minY) minY = y; if (y > maxY) maxY = y;
+        if (x === 0 || y === 0 || x === W - 1 || y === H - 1) edge = true;
+        if (x > 0 && b[p - 1] && !label[p - 1]) { label[p - 1] = id; stack.push(p - 1); }
+        if (x < W - 1 && b[p + 1] && !label[p + 1]) { label[p + 1] = id; stack.push(p + 1); }
+        if (y > 0 && b[p - W] && !label[p - W]) { label[p - W] = id; stack.push(p - W); }
+        if (y < H - 1 && b[p + W] && !label[p + W]) { label[p + W] = id; stack.push(p + W); }
+      }
+      comps.push({ px: px, minX: minX, maxX: maxX, minY: minY, maxY: maxY, edge: edge,
+                   w: maxX - minX + 1, h: maxY - minY + 1 });
+    }
+    // 1) 主要字元：高度合理、不會太寬、長寬比像字、不是貼邊的直線
+    comps.forEach(function (c) {
+      var ratio = c.h / c.w;
+      var density = c.px.length / (c.w * c.h);
+      var nearSide = c.minX < 0.1 * W || c.maxX > 0.9 * W;
+      var edgeLine = nearSide && (ratio > 8 || (density < 0.18 && ratio > 1.5));   // 車牌外框、斜邊
+      c.keep = c.h >= 0.28 * lineH && c.h <= 0.98 * lineH && c.w <= 0.3 * W &&
+               ratio >= 0.9 && ratio <= 12 && !edgeLine && !(c.edge && c.h > 0.95 * lineH);
+    });
+    // 1b) 單行車牌：字元高度相近、排在同一列，刪掉高度或位置差太多的區塊
+    if (rows === 1) {
+      var ks = comps.filter(function (c) { return c.keep; });
+      if (ks.length >= 3) {
+        var hs = ks.map(function (c) { return c.h; }).sort(function (a, b) { return a - b; });
+        var cy = ks.map(function (c) { return (c.minY + c.maxY) / 2; }).sort(function (a, b) { return a - b; });
+        var mh = hs[hs.length >> 1], my = cy[cy.length >> 1];
+        ks.forEach(function (c) {
+          if (Math.abs(c.h - mh) > 0.3 * mh || Math.abs((c.minY + c.maxY) / 2 - my) > 0.3 * mh) c.keep = false;
+        });
+      }
+    }
+    // 2) 救回字元的碎片：完全落在字元高度範圍內、不碰邊的小區塊（例如 E 斷掉的橫線）
+    var kept = comps.filter(function (c) { return c.keep; });
+    if (kept.length) {
+      var top = Math.min.apply(null, kept.map(function (c) { return c.minY; }));
+      var bot = Math.max.apply(null, kept.map(function (c) { return c.maxY; }));
+      var left = Math.min.apply(null, kept.map(function (c) { return c.minX; }));
+      var right = Math.max.apply(null, kept.map(function (c) { return c.maxX; }));
+      comps.forEach(function (c) {
+        if (!c.keep && !c.edge && c.minY >= top - 2 && c.maxY <= bot + 2 &&
+            c.minX >= left - 0.05 * W && c.maxX <= right + 0.05 * W && c.px.length >= 15 && c.w <= 0.3 * W) c.keep = true;
+      });
+    }
+    var out = new Uint8Array(W * H);
+    comps.forEach(function (c) { if (c.keep) c.px.forEach(function (q) { out[q] = 1; }); });
+    return out;
+  }
+  // 傾斜估計：找讓「字元黑點的水平投影」最集中的角度
+  function estimateAngle() {
+    var c = baseCanvas(0), W = c.width, H = c.height;
+    var kept = cleanBinary(binarize(toGray(c)), W, H, layoutRows());
+    var pts = [];
+    for (var i = 0; i < W * H; i += 2) if (kept[i]) pts.push(i);
+    if (pts.length < 50) return 0;
+    var best = 0, bestScore = -1;
+    for (var a = -25; a <= 25; a += 1) {
+      var t = a * Math.PI / 180, sn = Math.sin(t), cs = Math.cos(t), bins = {};
+      for (var j = 0; j < pts.length; j++) {
+        var x = pts[j] % W - W / 2, y = (pts[j] - pts[j] % W) / W - H / 2;
+        var yy = Math.round(x * sn + y * cs);
+        bins[yy] = (bins[yy] || 0) + 1;
+      }
+      var score = 0;
+      for (var key in bins) score += bins[key] * bins[key];
+      if (score > bestScore) { bestScore = score; best = a; }
+    }
+    return best;
+  }
+  function paint(bits, W, H, isGray) {
+    var pad = Math.round(H * 0.18);
+    var c = document.createElement("canvas");
+    c.width = W + pad * 2; c.height = H + pad * 2;
+    var ctx = c.getContext("2d");
+    ctx.fillStyle = "#fff"; ctx.fillRect(0, 0, c.width, c.height);
+    var id = ctx.createImageData(W, H), d = id.data;
+    for (var i = 0; i < W * H; i++) {
+      var v = isGray ? bits[i] : (bits[i] ? 0 : 255);
+      d[i * 4] = d[i * 4 + 1] = d[i * 4 + 2] = v; d[i * 4 + 3] = 255;
+    }
+    ctx.putImageData(id, pad, pad);
+    return c;
+  }
+  function makeVariant(kind) {
+    var c = baseCanvas(angleDeg), W = c.width, H = c.height, g = toGray(c);
+    if (kind === "B") return paint(g, W, H, true);
+    var b = binarize(g);
+    if (kind === "C") return paint(b, W, H, false);
+    return paint(cleanBinary(b, W, H, layoutRows()), W, H, false);
+  }
   function renderCrop() {
     if (!box) return;
-    var targetH = 120;
-    var k = Math.max(1, Math.min(4, targetH / box.h));
-    crop.width = Math.max(1, Math.round(box.w * k));
-    crop.height = Math.max(1, Math.round(box.h * k));
-    var ctx = crop.getContext("2d");
-    ctx.imageSmoothingQuality = "high";
-    ctx.drawImage(img, box.x, box.y, box.w, box.h, 0, 0, crop.width, crop.height);
-    var id = ctx.getImageData(0, 0, crop.width, crop.height);
-    var d = id.data, n = crop.width * crop.height, gray = new Uint8ClampedArray(n);
-    for (var i = 0; i < n; i++) gray[i] = 0.299 * d[i * 4] + 0.587 * d[i * 4 + 1] + 0.114 * d[i * 4 + 2];
-    var th = $("opt-bin").checked ? otsu(gray) : -1;
-    var inv = $("opt-inv").checked;
-    for (var j = 0; j < n; j++) {
-      var v = th >= 0 ? (gray[j] > th ? 255 : 0) : gray[j];
-      if (inv) v = 255 - v;
-      d[j * 4] = d[j * 4 + 1] = d[j * 4 + 2] = v;
-    }
-    ctx.putImageData(id, 0, 0);
+    angleDeg = $("opt-deskew").checked ? estimateAngle() : 0;
+    var v = makeVariant("A");
+    crop.width = v.width; crop.height = v.height;
+    crop.getContext("2d").drawImage(v, 0, 0);
+    $("angle-info").textContent = $("opt-deskew").checked ? "傾斜校正：" + (angleDeg > 0 ? "+" : "") + angleDeg + "°" : "";
   }
   function otsu(g) {
     var hist = new Array(256).fill(0), n = g.length;
@@ -300,8 +430,11 @@
     }
     return th;
   }
-  $("opt-bin").addEventListener("change", renderCrop);
+  $("opt-deskew").addEventListener("change", renderCrop);
   $("opt-inv").addEventListener("change", renderCrop);
+  Array.prototype.forEach.call(document.querySelectorAll('input[name="layout"]'), function (r) {
+    r.addEventListener("change", renderCrop);
+  });
 
   /* ---------- ② OCR ---------- */
   function getWorker(psm) {
@@ -317,23 +450,49 @@
       if (workerPsm === psm) return w;
       return w.setParameters({
         tessedit_char_whitelist: "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789-.",
-        tessedit_pageseg_mode: psm
+        tessedit_pageseg_mode: psm,
+        user_defined_dpi: "300"
       }).then(function () { workerPsm = psm; return w; });
     });
   }
 
+  var VARIANTS = [
+    { kind: "A", name: "二值化＋清除雜訊" },
+    { kind: "B", name: "灰階" },
+    { kind: "C", name: "二值化" }
+  ];
+  function scoreOf(a, conf) {
+    var s = conf * 0.5;
+    if (a.format) s += a.fixes ? 40 - 8 * a.fixes : 60;
+    return s;
+  }
   $("btn-ocr").addEventListener("click", function () {
     if (!box) return;
     var btn = $("btn-ocr");
     var psm = document.querySelector('input[name="layout"]:checked').value;
     btn.disabled = true;
     $("ocr-progress").textContent = "載入 OCR 引擎（第一次約需數秒）…";
-    var t0 = performance.now();
+    var t0 = performance.now(), cands = [];
     getWorker(psm).then(function (w) {
-      return w.recognize(crop);
-    }).then(function (res) {
-      var ms = performance.now() - t0;
-      showResult(res.data.text || "", res.data.confidence || 0, ms);
+      var chain = Promise.resolve();
+      VARIANTS.forEach(function (v, i) {
+        chain = chain.then(function () {
+          $("ocr-progress").textContent = "辨識中 " + (i + 1) + " / " + VARIANTS.length + "（" + v.name + "）";
+          return w.recognize(makeVariant(v.kind)).then(function (res) {
+            var text = res.data.text || "", conf = res.data.confidence || 0, a = analyse(text);
+            cands.push({ variant: v.name, raw: text, conf: conf, a: a, score: scoreOf(a, conf) });
+          });
+        });
+      });
+      return chain;
+    }).then(function () {
+      // 多個版本得到相同結果時加分（互相印證）
+      cands.forEach(function (c) {
+        var agree = cands.filter(function (o) { return o !== c && o.a.text && o.a.text === c.a.text; }).length;
+        c.score += agree * 15;
+      });
+      cands.sort(function (x, y) { return y.score - x.score; });
+      showResult(cands[0], cands, performance.now() - t0);
       $("ocr-progress").textContent = "完成";
     }).catch(function (e) {
       $("ocr-progress").textContent = "辨識失敗：" + e.message + "（請確認網路連線）";
@@ -382,9 +541,9 @@
     return bestFix || { text: c, display: c || "—", format: null, fixes: 0, all: [] };
   }
 
-  function showResult(raw, conf, ms) {
-    var a = analyse(raw);
-    last = { raw: raw.trim(), conf: conf, ms: ms, a: a };
+  function showResult(best, cands, ms) {
+    var a = best.a, conf = best.conf;
+    last = { raw: best.raw.trim(), conf: conf, ms: ms, a: a };
     show("step-result");
     $("plate-out").textContent = a.display;
     $("plate-out").setAttribute("data-ok", a.format ? "yes" : "no");
@@ -396,14 +555,15 @@
       ["OCR 信心分數", conf.toFixed(0) + " / 100"],
       ["格式判斷", fmt],
       ["易混字修正", a.fixes ? a.fixes + " 個字元（例如 O→0、B→8）" : "無"],
-      ["辨識耗時", (ms / 1000).toFixed(2) + " 秒"],
-      ["定位方式", box && box.score !== undefined ? "YOLO 自動偵測" : "手動框選"]
+      ["採用版本", best.variant + (angleDeg ? "，傾斜校正 " + angleDeg + "°" : "")],
+      ["辨識耗時", (ms / 1000).toFixed(2) + " 秒（" + cands.length + " 個版本）"],
+      ["定位方式", box && box.score !== undefined ? "YOLO 自動偵測" : "手動框選"],
+      ["其他候選", cands.slice(1).map(function (c) { return (c.a.display || "—") + "（" + c.conf.toFixed(0) + "）"; }).join("、") || "—"]
     ];
     $("result-spec").innerHTML = rows.map(function (r) {
       return "<div><dt>" + esc(r[0]) + "</dt><dd>" + esc(r[1]) + "</dd></div>";
     }).join("");
     $("verdict").hidden = true;
-    $("truth").value = "";
     $("step-result").scrollIntoView({ behavior: "smooth", block: "start" });
     $("truth").focus({ preventScroll: true });
   }
@@ -459,7 +619,7 @@
   }
 
   // 供測試用（不影響功能）
-  window.__plateLab = { analyse: analyse, decodeYolo: decodeYolo, otsu: otsu };
+  window.__plateLab = { analyse: analyse, decodeYolo: decodeYolo, otsu: otsu, makeVariant: makeVariant, estimateAngle: estimateAngle };
 
   checkModel();
 })();
