@@ -66,6 +66,7 @@
           <div>
             <p class="label">處理後的車牌影像</p>
             <canvas id="crop" class="crop"></canvas>
+            <p class="mono muted" id="angle-info"></p>
           </div>
           <div class="opts">
             <p class="label">車牌樣式</p>
@@ -74,8 +75,9 @@
               <label><input type="radio" name="layout" value="6"> 雙行（越南機車）</label>
             </div>
             <p class="label">影像前處理</p>
-            <label class="chk"><input type="checkbox" id="opt-bin" checked> 二值化（Otsu）</label>
+            <label class="chk"><input type="checkbox" id="opt-deskew" checked> 自動校正傾斜</label>
             <label class="chk"><input type="checkbox" id="opt-inv"> 反相（深底白字的車牌）</label>
+            <p class="muted">會自動嘗試 3 種前處理（二值化＋清除雜訊／灰階／二值化），選出最可信的結果。</p>
             <button type="button" class="btn" id="btn-ocr">開始辨識</button>
             <p class="mono muted" id="ocr-progress"></p>
           </div>
