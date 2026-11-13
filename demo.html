@@ -1,0 +1,135 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>車牌辨識實驗室｜YOLO 車牌辨識知識庫</title>
+  <meta name="description" content="上傳車牌照片，在瀏覽器內進行車牌偵測、OCR 字元辨識與格式檢查，並與正確答案比對。">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600;700&family=Noto+Sans+TC:wght@400;500;700;900&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="assets/style.css">
+</head>
+<body class="demo-page">
+  <header class="topbar">
+    <div class="wrap">
+      <a class="brand" href="index.html"><span class="brand-mark"></span>Plate-YOLO Wiki</a>
+      <nav>
+        <a href="index.html#entries">條目</a>
+        <a href="demo.html" aria-current="page">辨識實驗室</a>
+        <a class="hide-sm" href="entries/two-stage-lpr.html">流程說明</a>
+      </nav>
+    </div>
+  </header>
+
+  <main class="wrap demo">
+    <section class="demo-head">
+      <p class="kicker">// LAB · 兩階段車牌辨識實驗</p>
+      <h1>車牌辨識實驗室</h1>
+      <p class="lead">
+        上傳一張車牌照片，依照 <a href="entries/two-stage-lpr.html">002 兩階段流程</a>：
+        ① 找出車牌位置 → ② 字元辨識 → ③ 格式檢查，最後輸入正確答案，看看辨識得對不對。
+      </p>
+      <p class="privacy">🔒 照片只在你的瀏覽器中處理，不會上傳到任何伺服器，也不會被儲存。</p>
+      <div class="model-status" id="model-status" data-state="checking">偵測模型狀態檢查中…</div>
+    </section>
+
+    <div class="lab">
+      <!-- 步驟一：上傳 -->
+      <section class="step" id="step-upload">
+        <h2><span class="sec-no">01</span>上傳照片</h2>
+        <label class="drop" id="drop">
+          <input type="file" id="file" accept="image/*">
+          <span class="drop-t">點這裡選擇照片，或把照片拖曳進來</span>
+          <span class="drop-s">支援 JPG / PNG，建議車牌清楚可見</span>
+        </label>
+      </section>
+
+      <!-- 步驟二：框選車牌 -->
+      <section class="step" id="step-locate" hidden>
+        <h2><span class="sec-no">02</span>找出車牌位置</h2>
+        <p class="hint" id="locate-hint">用滑鼠（或手指）在圖上拖曳，框出車牌的範圍。</p>
+        <div class="stage" id="stage">
+          <canvas id="view"></canvas>
+        </div>
+        <div class="row">
+          <button type="button" class="btn ghost" id="btn-full">整張圖就是車牌</button>
+          <button type="button" class="btn ghost" id="btn-auto" hidden>重新自動偵測</button>
+          <span class="mono muted" id="box-info"></span>
+        </div>
+      </section>
+
+      <!-- 步驟三：辨識 -->
+      <section class="step" id="step-ocr" hidden>
+        <h2><span class="sec-no">03</span>字元辨識 (OCR)</h2>
+        <div class="ocr-grid">
+          <div>
+            <p class="label">處理後的車牌影像</p>
+            <canvas id="crop" class="crop"></canvas>
+          </div>
+          <div class="opts">
+            <p class="label">車牌樣式</p>
+            <div class="seg" role="radiogroup" aria-label="車牌樣式">
+              <label><input type="radio" name="layout" value="7" checked> 單行（台灣、越南汽車）</label>
+              <label><input type="radio" name="layout" value="6"> 雙行（越南機車）</label>
+            </div>
+            <p class="label">影像前處理</p>
+            <label class="chk"><input type="checkbox" id="opt-bin" checked> 二值化（Otsu）</label>
+            <label class="chk"><input type="checkbox" id="opt-inv"> 反相（深底白字的車牌）</label>
+            <button type="button" class="btn" id="btn-ocr">開始辨識</button>
+            <p class="mono muted" id="ocr-progress"></p>
+          </div>
+        </div>
+      </section>
+
+      <!-- 步驟四：結果 -->
+      <section class="step" id="step-result" hidden>
+        <h2><span class="sec-no">04</span>辨識結果與比對</h2>
+        <div class="result">
+          <div class="plate-out" id="plate-out">—</div>
+          <dl class="spec" id="result-spec"></dl>
+        </div>
+        <div class="truth">
+          <label for="truth">正確答案（你看到的車牌號碼）</label>
+          <div class="row">
+            <input class="search" id="truth" type="text" placeholder="例如 ABC-1234 或 51A-123.45" autocomplete="off">
+            <button type="button" class="btn" id="btn-check">比對</button>
+          </div>
+          <div class="verdict" id="verdict" hidden></div>
+        </div>
+      </section>
+
+      <!-- 測試紀錄 -->
+      <section class="step" id="step-log" hidden>
+        <h2><span class="sec-no">05</span>本次測試紀錄</h2>
+        <p class="hint">紀錄只保留在這個分頁，重新整理後就會清空。可以把這張表當作論文第四章實驗的雛形。</p>
+        <div class="scroll-x">
+          <table class="kv" id="log">
+            <thead><tr><th>#</th><th>辨識結果</th><th>正確答案</th><th>格式</th><th>字元正確率</th><th>整串</th></tr></thead>
+            <tbody></tbody>
+          </table>
+        </div>
+        <p class="mono" id="log-sum"></p>
+      </section>
+    </div>
+
+    <section class="note-box">
+      <h3>這個實驗室的限制</h3>
+      <ul>
+        <li><strong>OCR 不是專為車牌訓練的</strong>：字元辨識使用通用 OCR 引擎 Tesseract.js，遇到模糊、傾斜、雨夜照片時容易出錯，這正好是論文要改善的地方。</li>
+        <li><strong>自動偵測需要自己的模型</strong>：把訓練好的 YOLO 車牌模型匯出成 <code>models/plate.onnx</code> 放進專案，頁面就會自動框出車牌（說明見 <code>models/README.md</code>）。</li>
+        <li><strong>格式規則為簡化版</strong>：台灣與越南的車牌格式只涵蓋常見類型（待查證完整法規）。</li>
+      </ul>
+    </section>
+  </main>
+
+  <footer class="site">
+    <div class="wrap">
+      <span>丁國英｜勤益科大 電機碩一乙</span>
+      <span><a href="https://github.com/anh0997/plate-yolo-wiki">GitHub 原始碼</a></span>
+    </div>
+  </footer>
+
+  <script src="assets/demo.js"></script>
+</body>
+</html>
